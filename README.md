@@ -35,9 +35,9 @@ pnpm typecheck
 ```
 
 `pnpm test:watch` starts watch mode. `pnpm start` serves a completed production
-build. Tests cover input behavior, API validation, mocked OpenAI calls, safe errors,
-dynamic rendering, loading, duplicate prevention, timeout, and retry using mocked
-fetch responses, plus storage, hydration, reset, and Markdown safety. They never call the real API.
+build. Ten focused tests cover input, request success/failure, loading and timeout,
+history restoration/reset, malformed storage, and safe API errors. Fetch and
+OpenAI are mocked; tests never call the real API.
 
 ## Architecture and remaining work
 
@@ -59,7 +59,7 @@ without raw HTML. History is not sent as context or stored by the application se
 The chat hook prevents duplicate submissions and aborts browser requests after
 60 seconds. Loading feedback and safe errors keep the flow usable; failed or
 timed-out requests can be retried with the retained draft.
-Remaining phases cover broader testing, final quality review, and submission.
+Remaining phases cover final quality review and submission.
 
 See [architecture](docs/ARCHITECTURE.md), [development status](docs/DEVELOPMENT.md),
 and [repository instructions](AGENTS.md).

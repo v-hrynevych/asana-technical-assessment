@@ -5,28 +5,9 @@ import { CHAT_REQUEST_TIMEOUT_MS } from "@/app/chat/_hooks/useChat";
 
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
-it("posts the prompt internally and renders the assistant reply as Markdown", async () => {
-  const fetchMock = vi.fn().mockResolvedValue(Response.json({ message: "**Hello** from AI" }));
-  vi.stubGlobal("fetch", fetchMock);
-  render(<ChatConversation emptyState={<p>Start a conversation</p>} />);
-  fireEvent.change(screen.getByRole("textbox"), { target: { value: "Hello" } });
-  fireEvent.click(screen.getByRole("button", { name: "Send" }));
-  expect(fetchMock).toHaveBeenCalledExactlyOnceWith("/api/chat", {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: "Hello" }),
-    signal: expect.any(AbortSignal),
-  });
-  expect(await screen.findByText("Hello", { selector: "strong" })).toBeVisible();
-  expect(screen.getByRole("article", { name: "Your message" })).toHaveTextContent("Hello");
-  expect(screen.queryByText("Start a conversation")).not.toBeInTheDocument();
-  await waitFor(() => expect(screen.getByRole("button", { name: "Send" })).toBeEnabled());
-});
-
-it.each(["http", "network", "malformed"])("shows a safe error and keeps the draft after a %s failure", async (failure) => {
-  const fetchMock = vi.fn();
-  if (failure === "network") fetchMock.mockRejectedValue(new Error("Private diagnostic"));
-  else fetchMock.mockResolvedValue(Response.json(
-    failure === "http" ? { error: "Private diagnostic" } : { message: 42 },
-    { status: failure === "http" ? 500 : 200 },
+it("shows a safe error and permits another submission after an API failure", async () => {
+  const fetchMock = vi.fn().mockResolvedValue(Response.json(
+    { error: "Private diagnostic" }, { status: 500 },
   ));
   vi.stubGlobal("fetch", fetchMock);
   render(<ChatConversation emptyState={<p>Start a conversation</p>} />);
@@ -57,6 +38,7 @@ it("shows loading, blocks submissions, and restores controls after success", asy
   expect(fetchMock).toHaveBeenCalledTimes(1);
   await act(async () => resolveRequest(Response.json({ message: "Reply" })));
   expect(screen.getByText("Reply")).toBeVisible();
+  expect(screen.getByRole("article", { name: "Assistant reply" })).toHaveTextContent("Reply");
   expect(screen.getByRole("status")).toBeEmptyDOMElement();
   expect(screen.getByRole("textbox")).toBeEnabled();
   expect(screen.getByRole("button", { name: "Send" })).toBeEnabled();

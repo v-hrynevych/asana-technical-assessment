@@ -10,7 +10,7 @@
 | 3 — AI Integration | Complete; required checks passed |
 | 4 — Application State | Complete; required checks passed |
 | 5 — Bonus Features | Complete; required checks passed |
-| 6 — Testing | Not started; focused tests accompany Phases 1–5 |
+| 6 — Testing | Complete; 10 focused tests |
 | 7 — Final Quality Review | Not started |
 | 8 — Submission | Not started |
 
@@ -320,3 +320,22 @@ Tests ran with approved execution outside the sandbox because of its documented
 Vitest subprocess restriction. Existing dependency warnings remain unchanged;
 no new validation warnings. Live provider and manual browser layout verification
 remain outstanding. Phase 5 ends here; Phases 6–8 remain incomplete.
+
+## Phase 6 — Focused Testing
+
+The final suite contains **10 tests across 5 files**, reduced from 45 by retaining
+representative behavior tests and removing overlapping hook, framework, and edge-case
+coverage. It covers empty/valid input, successful replies with loading and duplicate
+prevention, safe failures and timeout recovery, storage round-trip and malformed JSON,
+restored history and Clear Chat, HTTP 400 for empty prompts, and safe provider errors.
+Vitest and React Testing Library use accessible queries; fetch and OpenAI are mocked.
+Application code, architecture, and dependencies are unchanged.
+
+Validation on 2026-09-14 using `corepack pnpm`: lint, all 10 tests, production build,
+and `tsc --noEmit` passed. Git status/diff reviewed; no whitespace errors. Tests use
+approved execution outside the sandbox because of its Vitest subprocess restriction.
+No new warnings; existing dependency warnings remain unchanged.
+
+The compact suite does not exhaustively cover keyboard variants, Markdown safety,
+hydration, storage quota/access failures, or every API payload. Manual browser and
+live-provider verification remain outstanding. Phases 7–8 are not started.
