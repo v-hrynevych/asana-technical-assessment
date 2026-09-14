@@ -7,10 +7,10 @@
 | 0 — Planning | Requirements and architecture defined in root AGENTS.md |
 | 1 — Project Bootstrap | Complete; required checks passed |
 | 2 — Static Chat UI | Complete; required checks passed |
-| 3 — AI Integration | Not started |
+| 3 — AI Integration | Complete; required checks passed |
 | 4 — Application State | Not started |
 | 5 — Bonus Features | Not started |
-| 6 — Testing | Not started; infrastructure and basic input tests exist from Phases 1–2 |
+| 6 — Testing | Not started; focused tests accompany Phases 1–3 |
 | 7 — Final Quality Review | Not started |
 | 8 — Submission | Not started |
 
@@ -113,3 +113,84 @@ jsdom does not emulate native textarea newline insertion.
 
 Phase 2 ends here. Phases 3–8 remain unimplemented; no API integration, fetch,
 chat business hook, persistence, Markdown, request state, or timeout was added.
+
+## Phase 3 — AI Integration
+
+Connected the existing UI to the internal POST route and rendered successful
+user/assistant exchanges as plain text without page reload. `ChatConversation`
+owns the minimum request state: pending feedback, disabled input during the
+request, generic failure feedback, and in-memory results. Draft text is retained.
+There is no multi-turn provider context; only the current prompt is sent.
+
+API contract:
+
+| Case | HTTP | JSON |
+| --- | --- | --- |
+| Request | POST `/api/chat` | `{ "prompt": "..." }` |
+| Completed text response | 200 | `{ "message": "AI response" }` |
+| Empty, whitespace-only, missing, or non-string prompt | 400 | `{ "error": "Please enter a message." }` |
+| Malformed JSON | 400 | `{ "error": "Please send a valid JSON request." }` |
+| Provider, configuration, incomplete/empty output failure | 500 | `{ "error": "Unable to get a response. Please try again." }` |
+
+Security and SDK decisions:
+
+- Used the installed OpenAI SDK's `responses.create`, `output_text`, and model
+  `gpt-5.5`, following its local README and the official text generation guide.
+- Credentials come exclusively from `process.env.OPENAI_API_KEY` on the server.
+  Client creation is deferred until a valid request, keeping builds key-free.
+- Added only `server-only@0.0.1` to enforce the import boundary in Next.js.
+- No raw provider errors, stack traces, prompts, or credentials are logged or
+  exposed in errors. The client also uses a fixed safe message for network,
+  HTTP, and malformed-response failures.
+- Requests set `store: false`; no persistence or prior response ID is used.
+- Full state management, custom timeout/retry handling, streaming, LocalStorage,
+  Clear Chat, Markdown, authentication, and a database remain outside this phase.
+
+Created:
+
+- `lib/openai.ts`
+- `app/api/chat/route.ts`
+- `app/chat/_types/chat.ts`
+- `app/chat/_components/ChatConversation.tsx`
+- `tests/chat/route.test.ts`
+- `tests/chat/ChatConversation.test.tsx`
+
+Modified:
+
+- `app/chat/_components/Chat.tsx`
+- `app/chat/_components/ChatInput.tsx`
+- `app/chat/_components/ChatMessages.tsx`
+- `app/chat/_components/EmptyState.tsx`
+- `tests/chat/ChatInput.test.tsx`
+- `package.json` and `pnpm-lock.yaml`
+- `README.md`, `docs/ARCHITECTURE.md`, and `docs/DEVELOPMENT.md`
+
+No files deleted. `.env.example` already contains the required blank key entry.
+
+Tests exercise the actual route and server helper with the OpenAI SDK mocked,
+including malformed/invalid input, trimmed prompts, normalized success, provider
+failure, missing configuration, and unusable output. The `server-only` marker is
+mocked only in the Node route test. Component tests mock fetch to check the internal
+request contract, plain-text rendering, and safe HTTP/network/payload failures.
+No automated test calls the real provider or needs real credentials.
+
+Validation on 2026-09-13 using `corepack pnpm`:
+
+| Command | Result |
+| --- | --- |
+| `pnpm lint` | Passed; zero warnings |
+| `pnpm test` | Passed; 23 tests in 4 files |
+| `pnpm build` | Passed; dynamic `/api/chat`, static `/chat` |
+| `pnpm exec tsc --noEmit` | Passed |
+| `git status` / `git diff` / `git diff --check` | Reviewed; no whitespace errors |
+
+The sandbox selected a different pnpm store and blocked Vitest startup with
+`spawn EPERM`; approved execution resolved both. An initial TypeScript narrowing
+error was fixed by constructing typed exchange messages before the state updater;
+all required checks subsequently passed. Installation repeated the existing
+ESLint/whatwg-encoding deprecation and skipped unrs-resolver build-script warnings.
+No new validation warnings remain.
+
+Live provider access and manual browser verification were not performed. Running
+the app against OpenAI requires a configured key with access to `gpt-5.5`.
+Phase 3 ends here; Phases 4–8 remain incomplete.

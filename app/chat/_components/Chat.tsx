@@ -1,7 +1,7 @@
 import { Box, Container, Paper } from "@mui/material";
 import ChatHeader from "./ChatHeader";
-import ChatInput from "./ChatInput";
-import ChatMessages from "./ChatMessages";
+import ChatConversation from "./ChatConversation";
+import EmptyState from "./EmptyState";
 
 export default function Chat() {
   return (
@@ -12,8 +12,7 @@ export default function Chat() {
           sx={{ display: "flex", flexDirection: "column", minHeight: "calc(100dvh - 96px)", borderRadius: 3, overflow: "hidden" }}
         >
           <ChatHeader />
-          <ChatMessages />
-          <ChatInput />
+          <ChatConversation emptyState={<EmptyState />} />
         </Paper>
       </Container>
     </Box>

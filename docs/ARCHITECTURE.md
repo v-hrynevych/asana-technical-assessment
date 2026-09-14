@@ -24,38 +24,47 @@ app/
     _components/             Chat layout, header, empty message area, and input
     _hooks/                  Reserved for chat behavior
     _lib/                    Reserved for chat utilities
-    _types/                  Reserved for chat types
-  api/chat/                  Reserved for the future Route Handler
-lib/                         Reserved for shared server infrastructure
+    _types/                  Chat payload and message types
+  api/chat/route.ts          POST validation and normalized JSON responses
+lib/openai.ts                Server-only OpenAI Responses API call
 tests/
   setup.ts                   DOM matchers and cleanup
   bootstrap.test.tsx         MUI/React rendering infrastructure smoke test
-  chat/                      Basic input component tests
+  chat/                      Input, mocked API, and request/rendering tests
 docs/                        Architecture and implementation status
 ```
 
 Empty directories contain `.gitkeep` files so Git preserves them. Feature files
-such as `useChat.ts`, `storage.ts`, `lib/openai.ts`, and
-`app/api/chat/route.ts` are intentionally deferred. Loading and error boundaries
+such as `useChat.ts` and `storage.ts` are intentionally deferred. Loading and error boundaries
 will be added with their corresponding behavior rather than as nonfunctional stubs.
 
-## Phase 2 UI boundary
+## Phase 3 request flow and boundaries
 
-`Chat`, `ChatHeader`, `ChatMessages`, and `EmptyState` remain Server Components.
-Only `ChatInput` declares an application client boundary for draft input, keyboard
-events, and a preview confirmation. Its optional submit callback provides a test
-seam; the server page passes no function across the boundary. Submission keeps the
-draft and confirms that nothing was sent. The conversation area stays static.
-MUI primitives supply responsive styling within the existing cache provider.
-No chat hook, request, or message history is introduced.
+Browser → `POST /api/chat` → `lib/openai.ts` → OpenAI Responses API →
+Route Handler → browser. The route parses JSON as unknown, validates a nonempty
+string prompt, trims it, and normalizes success/error payloads. Provider details
+are neither returned nor logged. The server helper constructs the SDK client at
+request time from `process.env.OPENAI_API_KEY`, so imports/builds need no key.
+The `server-only` guard prevents client imports. The installed SDK's
+`responses.create` and `output_text` approach follows the
+[official text generation guide](https://developers.openai.com/api/docs/guides/text).
+The server selects `gpt-5.5`; the browser cannot select a model or supply credentials.
+Incomplete or empty text responses become generic failures. `store: false` avoids
+requesting response storage for later retrieval; it is not a zero-retention guarantee.
+
+The page, `Chat`, `ChatHeader`, and `EmptyState` remain Server Components.
+`ChatConversation` is the interactive client boundary and imports `ChatMessages`
+and `ChatInput`. The empty state is passed as rendered children through a prop,
+preserving server rendering. Local state holds successful plain-text exchanges,
+pending feedback, and a generic error. The draft is retained for retry or editing.
+Only `{ prompt }` is sent, so each request is independent of displayed exchanges.
+The client validates the success payload before rendering it as escaped React text.
+No provider or server-module imports cross into the browser.
 
 ## Planned boundaries (not implemented)
 
-The request flow will be browser → `POST /api/chat` → server-only OpenAI client →
-Route Handler → browser. Validation and normalized provider errors belong on the
-server; secrets stay in `.env.local` and must never enter client bundles.
-
-Chat state will use a local React hook, without a global state library. Browser
+Full chat state behavior will use a local React hook, without a global state library. Browser
 persistence will be isolated in `app/chat/_lib/storage.ts`, and Markdown will be
 rendered only for assistant messages. These are later-phase decisions, not current
-capabilities. No API calls, persistence, or Markdown rendering exists in Phase 1.
+capabilities. Application timeout/cancellation, persistence, and Markdown are not
+implemented. SDK default request/retry behavior remains unchanged.

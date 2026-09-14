@@ -10,7 +10,7 @@ export default function EmptyState() {
         Ask something you’re curious about, explore an idea, or find a fresh perspective.
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-        This is a static preview. AI replies aren’t available yet.
+        Each message starts a fresh question. Previous messages aren’t sent to the AI.
       </Typography>
     </Box>
   );

@@ -19,7 +19,6 @@ it("invokes submit behavior with a valid trimmed prompt", () => {
   fireEvent.change(screen.getByRole("textbox"), { target: { value: "  Hello  " } });
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   expect(onSubmit).toHaveBeenCalledExactlyOnceWith("Hello");
-  expect(screen.getByRole("status")).toHaveTextContent("your message has not been sent");
 });
 
 it("submits on Enter", () => {
