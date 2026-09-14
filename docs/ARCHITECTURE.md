@@ -22,7 +22,7 @@ app/
   chat/
     page.tsx                 Server-rendered chat composition
     _components/             Chat layout, header, empty message area, and input
-    _hooks/                  Reserved for chat behavior
+    _hooks/useChat.ts         Client request lifecycle and in-memory messages
     _lib/                    Reserved for chat utilities
     _types/                  Chat payload and message types
   api/chat/route.ts          POST validation and normalized JSON responses
@@ -35,7 +35,7 @@ docs/                        Architecture and implementation status
 ```
 
 Empty directories contain `.gitkeep` files so Git preserves them. Feature files
-such as `useChat.ts` and `storage.ts` are intentionally deferred. Loading and error boundaries
+such as `storage.ts` are intentionally deferred. Loading and error boundaries
 will be added with their corresponding behavior rather than as nonfunctional stubs.
 
 ## Phase 3 request flow and boundaries
@@ -55,16 +55,42 @@ requesting response storage for later retrieval; it is not a zero-retention guar
 The page, `Chat`, `ChatHeader`, and `EmptyState` remain Server Components.
 `ChatConversation` is the interactive client boundary and imports `ChatMessages`
 and `ChatInput`. The empty state is passed as rendered children through a prop,
-preserving server rendering. Local state holds successful plain-text exchanges,
-pending feedback, and a generic error. The draft is retained for retry or editing.
+preserving server rendering. `useChat` holds successful plain-text exchanges and
+request state; `ChatConversation` presents its results. The draft is retained in
+`ChatInput` for retry or editing.
 Only `{ prompt }` is sent, so each request is independent of displayed exchanges.
 The client validates the success payload before rendering it as escaped React text.
 No provider or server-module imports cross into the browser.
 
+## Phase 4 client request lifecycle
+
+`useChat` uses a discriminated union for idle, pending, and error states. Entering
+pending clears the prior error. A ref locks submission synchronously, including
+multiple calls before React rerenders. Empty prompts are rejected in the hook as
+well as the input. Success appends the exchange and returns to idle; failures
+preserve messages and draft text and expose only a fixed safe error message.
+
+Submission and request callbacks drive state transitions. Loading and error values
+are derived during render, and initial state uses simple constant values. The
+single effect ties the network request and timer lifetime to the mounted chat:
+its unmount handler invalidates the request, aborts fetch, and clears the timer.
+It does not initiate requests or orchestrate application state.
+
+`CHAT_REQUEST_TIMEOUT_MS` is 60,000 ms. Each request has an AbortController and
+timer covering fetch and JSON body consumption. Timeout aborts the browser request,
+releases the submission lock, and displays the timeout message immediately.
+Request identity checks ignore late completions so they cannot append stale
+messages, replace an error, or unlock a newer request. Completion and unmount
+clear timers; unmount invalidates and aborts the active request.
+
+The UI keeps existing messages visible, disables conflicting input actions, and
+shows an MUI spinner with a polite status message. Errors use an alert. The API
+contract and server-only OpenAI integration are unchanged. Browser abort does not
+guarantee cancellation of provider work already running on the server.
+
 ## Planned boundaries (not implemented)
 
-Full chat state behavior will use a local React hook, without a global state library. Browser
-persistence will be isolated in `app/chat/_lib/storage.ts`, and Markdown will be
+Browser persistence will be isolated in `app/chat/_lib/storage.ts`, and Markdown will be
 rendered only for assistant messages. These are later-phase decisions, not current
-capabilities. Application timeout/cancellation, persistence, and Markdown are not
-implemented. SDK default request/retry behavior remains unchanged.
+capabilities. Persistence and Markdown are not implemented. SDK default
+request/retry behavior remains unchanged.

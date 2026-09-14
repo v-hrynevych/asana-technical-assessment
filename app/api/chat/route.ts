@@ -28,8 +28,6 @@ export async function POST(request: Request) {
 
   try {
     const message = await generateReply(body.prompt.trim());
-    console.log(message);
-
     return Response.json({ message } satisfies ChatResponse);
   } catch (error) {
     console.error("generateReply failed:", error);

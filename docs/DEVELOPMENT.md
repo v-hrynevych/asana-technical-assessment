@@ -8,9 +8,9 @@
 | 1 — Project Bootstrap | Complete; required checks passed |
 | 2 — Static Chat UI | Complete; required checks passed |
 | 3 — AI Integration | Complete; required checks passed |
-| 4 — Application State | Not started |
+| 4 — Application State | Complete; required checks passed |
 | 5 — Bonus Features | Not started |
-| 6 — Testing | Not started; focused tests accompany Phases 1–3 |
+| 6 — Testing | Not started; focused tests accompany Phases 1–4 |
 | 7 — Final Quality Review | Not started |
 | 8 — Submission | Not started |
 
@@ -194,3 +194,65 @@ No new validation warnings remain.
 Live provider access and manual browser verification were not performed. Running
 the app against OpenAI requires a configured key with access to `gpt-5.5`.
 Phase 3 ends here; Phases 4–8 remain incomplete.
+
+## Phase 4 — Application State
+
+Request behavior lives in `app/chat/_hooks/useChat.ts`; `ChatConversation`
+presents messages, loading feedback, and errors.
+The hook owns in-memory exchanges and an idle/pending/error union. A synchronous
+active-request ref prevents duplicate submissions before rerender, while disabled
+controls prevent conflicting interaction. Empty prompts are rejected at both
+input and hook boundaries. Starting a valid request clears the previous error.
+
+Submission and request callbacks update state directly. Loading and error values
+are derived during render; initial state consists of simple constant values.
+The only effect synchronizes the lifetime of the external network request and
+timer with the mounted chat instance by aborting and clearing them on unmount.
+
+`CHAT_REQUEST_TIMEOUT_MS = 60_000` allows one minute for fetch and response-body
+reading. The timer aborts the browser request through AbortController, releases
+loading immediately, and shows exactly "The request timed out. Please try again."
+Identity checks discard stale responses after timeout, retry, or unmount. Timers
+are cleared on completion and unmount; unmount also aborts the active request.
+Browser cancellation does not guarantee that existing server/provider work stops.
+
+Success preserves earlier messages, appends the exchange, and restores controls.
+HTTP, network, and malformed-payload failures show the existing safe generic error.
+Draft input is retained for retry. A spinner and polite status message communicate
+loading; an alert announces errors. Server Components and the Phase 3 API contract
+remain unchanged. No dependencies or Phase 5 features were added.
+
+Created:
+
+- `app/chat/_hooks/useChat.ts`
+- `tests/chat/useChat.test.tsx`
+
+Modified:
+
+- `app/chat/_components/ChatConversation.tsx`
+- `tests/chat/ChatConversation.test.tsx`
+- `README.md`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT.md`
+
+No files deleted.
+
+Tests mock fetch and use fake timers. Coverage includes loading and disabled
+controls, same-tick duplicate calls, empty input, successful completion, safe failures
+and retry, timeout/abort and retry, late responses, timeout during JSON reading,
+unmount cancellation, and preservation of earlier messages. No live provider calls.
+
+Validation on 2026-09-14 using `corepack pnpm`:
+
+| Command | Result |
+| --- | --- |
+| `pnpm lint` | Passed; zero warnings |
+| `pnpm test` | Passed; 29 tests in 5 files |
+| `pnpm build` | Passed |
+| `pnpm exec tsc --noEmit` | Passed |
+| `git status` / `git diff` / `git diff --check` | Reviewed; no whitespace errors |
+
+Tests require execution outside this environment's sandbox because it blocks
+Vitest subprocess startup. Existing dependency warnings remain as recorded in
+Phase 1. Manual browser verification and live provider verification remain
+outstanding. Phase 4 ends here; Phases 5–8 remain incomplete.

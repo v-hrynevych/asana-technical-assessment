@@ -1,7 +1,7 @@
 # AI Chat Challenge
 
-A technical assessment for a small generative AI chat application. **Phase 3
-(AI integration) is implemented.** Visit `/chat` to submit a prompt and receive
+A technical assessment for a small generative AI chat application. **Phase 4
+(application state) is implemented.** Visit `/chat` to submit a prompt and receive
 a plain-text AI response without reloading the page.
 
 ## Stack
@@ -36,7 +36,8 @@ pnpm typecheck
 
 `pnpm test:watch` starts watch mode. `pnpm start` serves a completed production
 build. Tests cover input behavior, API validation, mocked OpenAI calls, safe errors,
-and dynamic rendering using mocked fetch responses. They never call the real API.
+dynamic rendering, loading, duplicate prevention, timeout, and retry using mocked
+fetch responses. They never call the real API.
 
 ## Architecture and remaining work
 
@@ -51,9 +52,10 @@ with a safe `{ "error": "..." }` payload. A `server-only` import guard protects 
 OpenAI module. Only the current prompt is sent; displayed exchanges exist in
 memory and disappear on refresh. The SDK request sets `store: false`.
 
-Basic pending feedback and a generic failure message support the request flow.
-Later phases add full state handling, application timeouts, persistence, Clear Chat,
-Markdown rendering, and further behavior tests.
+The chat hook prevents duplicate submissions and aborts browser requests after
+60 seconds. Loading feedback and safe errors keep the flow usable; failed or
+timed-out requests can be retried with the retained draft.
+Later phases add persistence, Clear Chat, Markdown rendering, and further tests.
 
 See [architecture](docs/ARCHITECTURE.md), [development status](docs/DEVELOPMENT.md),
 and [repository instructions](AGENTS.md).
