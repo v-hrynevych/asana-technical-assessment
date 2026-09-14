@@ -1,76 +1,86 @@
-# AI Chat Challenge
+﻿# AI Chat Challenge
 
-A technical assessment for a small generative AI chat application. **Phase 7
-quality fixes are implemented; manual browser review remains pending.** Visit `/chat` for AI replies with Markdown,
-browser-persisted history, and Clear Chat.
+A small technical interview application for asking questions and continuing an AI
+conversation. Opening `/` redirects to `/chat`. Replies render without a page reload,
+and completed conversations survive refresh in the same browser.
 
-## Stack
+## Assessment coverage
 
-Next.js App Router, React, strict TypeScript, pnpm, and Material UI with Emotion.
-The OpenAI SDK handles server requests; react-markdown renders assistant replies. Testing uses Vitest,
-React Testing Library, jest-dom, and jsdom; linting uses ESLint's Next.js presets.
+| Requirement | Implementation |
+| --- | --- |
+| Text input and submit button | Labeled multiline composer; Enter sends, Shift + Enter adds a line; accepted submissions clear immediately |
+| Generative AI and dynamic rendering | Server-only OpenAI Responses API with ordered conversation context; React updates the UI |
+| Loading states | MUI skeletons with distinct history-restoration and response-generation status text |
+| Empty input, errors, and timeout | Whitespace validation, safe error alerts, duplicate prevention, and a 60-second browser timeout |
+| Components and semantic HTML | Focused components with main/header/section/article/form elements and live announcements |
+| Responsive design | Viewport-constrained layout, anchored composer, internal message scrolling, mobile controls |
+| Bonus: persistence and reset | Validated LocalStorage history; Clear Chat removes visible/saved history and future context |
+| Bonus: Markdown | Assistant headings, lists, emphasis, links, inline code, and scrolling code blocks; user text stays plain |
+| Bonus: tests | 14 focused tests covering input, state, storage, Markdown, routing, and API contracts |
 
-## Local setup
+## Stack and architecture
+
+Next.js App Router, React, strict TypeScript, Material UI/Emotion, OpenAI SDK,
+react-markdown, and pnpm. Tests use Vitest and React Testing Library; ESLint uses
+Next.js presets.
+
+```text
+Browser → POST /api/chat → server-only OpenAI client → OpenAI → JSON reply → UI
+```
+
+Route Handlers keep validation, credentials, and provider calls in one application.
+These small backend responsibilities do not justify a separate server or deployment.
+Server Components are the default; `ChatConversation` owns the interactive boundary.
+Feature-specific components, hooks, types, and storage helpers are colocated in
+private folders under `app/chat/`; shared server integration lives in `lib/openai.ts`.
+Local React state is sufficient; no global state library is used.
+
+Requests contain ordered user/assistant messages, including restored history and
+the newest prompt once. Only completed exchanges persist in LocalStorage; loading
+and errors stay in memory. Clear Chat starts a new context.
+
+## Run locally
 
 Use Node.js 22.15+ within Node 22, or Node.js 24+, and pnpm 10.30.3 (pinned in
-`package.json`). With Corepack available, run `corepack enable` to expose pnpm.
-If pnpm is not on PATH, use `corepack pnpm` in place of `pnpm` below.
+`package.json`). If pnpm is unavailable on PATH, use `corepack pnpm` instead.
 
-```bash
-pnpm install --frozen-lockfile
-pnpm dev
-```
+1. Run `pnpm install --frozen-lockfile`.
+2. Copy `.env.example` to `.env.local` and set `OPENAI_API_KEY` to your own key.
+   The configured model is `gpt-5.5`; your account must have access.
+3. Run `pnpm dev` and open [localhost:3000](http://localhost:3000).
+   Restart the server after changing environment variables.
 
-Copy `.env.example` to `.env.local` and set `OPENAI_API_KEY`, then open
-http://localhost:3000/chat. The server uses `gpt-5.5` through the Responses API;
-the key needs access to that model. Restart the development server after changing
-environment variables. Never use a public environment variable for secrets.
-Tests mock OpenAI and builds do not require a key.
+| Command | Purpose |
+| --- | --- |
+| `pnpm dev` | Development server |
+| `pnpm lint` | Lint with zero warnings allowed |
+| `pnpm test` | All 14 tests; no real OpenAI calls |
+| `pnpm test:watch` | Watch tests |
+| `pnpm typecheck` | Generate route types and check TypeScript |
+| `pnpm exec tsc --noEmit` | Check TypeScript after route types exist |
+| `pnpm build` | Production build; no API key required |
+| `pnpm start` | Serve the production build |
 
-```bash
-pnpm lint
-pnpm test
-pnpm build
-pnpm typecheck
-```
+## Security and trade-offs
 
-`pnpm test:watch` starts watch mode. `pnpm start` serves a completed production
-build. Fourteen focused tests cover the root redirect, input, request success/failure,
-loading and timeout, history restoration/reset, Markdown, conversation context,
-malformed storage/payloads, and safe API errors. Fetch and
-OpenAI are mocked; tests never call the real API.
+- The key is read only on the server, protected by `server-only`, and never placed
+  in public environment variables. `.env.local` is ignored; `.env.example` is blank.
+- The API validates roles/content and returns generic provider errors without raw
+  exception logging. Assistant Markdown skips raw HTML and uses default URL filtering.
+- History is unencrypted in this browser and sent to OpenAI as context. The application
+  server does not persist it. Responses use `store: false`, which is not a guarantee
+  of zero provider retention.
+- Full history is resent, increasing cost and potentially reaching context limits.
+  Blocked/full storage falls back to in-memory use. Responses are not streamed.
+- Failed prompts are not persisted or restored into the cleared draft. Browser
+  cancellation does not guarantee provider cancellation.
+- This assessment has no authentication, rate limiting, or request-size budget.
+  Public deployment would need abuse/spend controls. Context budgeting and broader
+  device coverage are possible future improvements, not implemented features.
 
-## Architecture and remaining work
+Tests mock fetch/OpenAI and cover meaningful behavior. Chromium checks supplement
+jsdom for keyboard, layout, and network-state verification. Live-provider answers
+and physical-device keyboards were not verified.
 
-Server Components are the default. Chat-specific components, hooks, utilities,
-and types are colocated in private folders under `app/chat/`. The
-backend is a Next.js Route Handler calling OpenAI exclusively on the server.
-No separate backend or global state library is needed.
-
-`POST /api/chat` accepts `{ "messages": [{ "role": "user", "content": "..." }] }`
-and returns `{ "message": "..." }`. The ordered array includes completed user/assistant
-history and the newest user message once. Only these two roles and nonempty content
-are accepted, and the final message must be from the user.
-Invalid input returns HTTP 400; provider/configuration failures return HTTP 500
-with a safe `{ "error": "..." }` payload. A `server-only` import guard protects the
-OpenAI module. History restored from this browser's LocalStorage is included as
-context for the next request. The SDK request sets `store: false`.
-Clear Chat removes saved and visible history and is disabled during requests.
-If storage is blocked or full, the chat still works in memory. User messages remain
-plain text; assistant Markdown supports headings, lists, emphasis, code, and links
-without raw HTML. The application server does not persist history. Each request
-resends the conversation; very long histories may reach the provider's context limit.
-
-The chat hook prevents duplicate submissions and aborts browser requests after
-60 seconds. Valid submissions clear the input immediately. History initialization
-shows "Loading chat history..." with skeletons before displaying saved messages or
-the empty state. Pending replies show "Generating response..." with a soft gray
-message-style skeleton. Safe errors allow a
-new submission after failure or timeout. Manual quality review remains pending;
-submission has not started.
-
-Opening `/` redirects to `/chat` on the server. The viewport-constrained chat keeps
-the composer anchored while long conversations scroll inside the message area.
-
-See [architecture](docs/ARCHITECTURE.md), [development status](docs/DEVELOPMENT.md),
-and [repository instructions](AGENTS.md).
+See [architecture](docs/ARCHITECTURE.md) for technical decisions and
+[development](docs/DEVELOPMENT.md) for phase completion and final validation.

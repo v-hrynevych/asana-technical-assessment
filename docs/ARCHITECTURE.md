@@ -1,140 +1,115 @@
-# Architecture
+﻿# Architecture
 
-## Phase 1 foundation
+## Full-stack approach and colocation
 
-Next.js App Router provides routing and the future backend in one application.
-`app/layout.tsx`, `app/page.tsx`, and `app/chat/page.tsx` remain Server Components.
-The layout uses MUI's `AppRouterCacheProvider` to collect Emotion styles during
-streaming. Its library-owned client boundary does not convert page children into
-Client Components. No custom theme or application state is introduced.
+Next.js App Router serves the UI and `POST /api/chat`. Validation, one provider call,
+and error normalization fit a Route Handler; a separate backend would add deployment
+and integration work without a requirement to justify it. The root Server Component
+redirects `/` to the canonical `/chat` route.
 
-The integration follows the [MUI App Router guide](https://mui.com/material-ui/integrations/nextjs/).
-ESLint runs separately from the production build, as described in the
-[Next.js installation guide](https://nextjs.org/docs/app/getting-started/installation).
+Pages, layout, `Chat`, `ChatHeader`, and `EmptyState` are Server Components.
+`ChatConversation` is the interactive client boundary, importing input/message
+presentation and using `useChat`. The server-rendered empty state passes through a
+prop. MUI's AppRouterCacheProvider collects Emotion styles without converting its
+child pages to Client Components.
 
-## Directory responsibilities
+| Location | Responsibility |
+| --- | --- |
+| `app/chat/page.tsx` | Route composition |
+| `app/chat/_components/` | Layout, composer, messages, loading, empty state |
+| `app/chat/_hooks/useChat.ts` | Local state and request lifecycle |
+| `app/chat/_lib/storage.ts` | Validated LocalStorage access |
+| `app/chat/_types/chat.ts` | Message and API payload types |
+| `app/api/chat/route.ts` | Request validation and normalized responses |
+| `lib/openai.ts` | Server-only OpenAI integration |
+| `tests/chat/` | Component, storage, routing, and API tests |
+
+Private route folders keep feature code together without creating routes. No global
+component/hook folders or state-management dependencies are needed.
+
+## API and conversation context
 
 ```text
-app/
-  layout.tsx                 Root document and MUI cache integration
-  globals.css                Minimal global defaults
-  page.tsx                   Server redirect to canonical /chat route
-  chat/
-    page.tsx                 Server-rendered chat composition
-    _components/             Chat layout, header, empty message area, and input
-    _hooks/useChat.ts         Client request lifecycle and in-memory messages
-    _lib/storage.ts          Validated browser history read/save/remove helpers
-    _types/                  Chat payload and message types
-  api/chat/route.ts          POST validation and normalized JSON responses
-lib/openai.ts                Server-only OpenAI Responses API call
-tests/
-  setup.ts                   DOM matchers and cleanup
-  bootstrap.test.tsx         MUI/React rendering infrastructure smoke test
-  chat/                      Input, mocked API, and request/rendering tests
-docs/                        Architecture and implementation status
+Browser → POST /api/chat → lib/openai.ts → OpenAI Responses API → route → browser
 ```
 
-Empty directories contain `.gitkeep` files so Git preserves them. Loading and error boundaries
-will be added with their corresponding behavior rather than as nonfunctional stubs.
+The request is `{ messages: [{ role, content }, ...] }`; success returns
+`{ message: string }`. The client sends completed exchanges in order, including
+restored history, followed by the newest trimmed user prompt once. IDs and transient
+state are excluded. The route parses JSON as unknown and requires a nonempty array,
+`user`/`assistant` roles, non-whitespace string content, and a final user message.
+It copies only role/content while preserving code whitespace. Malformed JSON or
+payloads return HTTP 400; provider/configuration/unusable-output failures return
+HTTP 500 with a safe error payload. Raw exceptions are not logged.
 
-## Phase 3 request flow and boundaries
+The server helper constructs OpenAI at request time from `OPENAI_API_KEY`, guarded
+by `server-only`; builds need no key. It sends the validated array as Responses API
+`input`, uses `gpt-5.5` and `store: false`, and returns completed `output_text`.
+The browser cannot select a model or supply provider credentials. No server sessions,
+previous-response IDs, or server history persistence are used.
 
-Browser → `POST /api/chat` → `lib/openai.ts` → OpenAI Responses API →
-Route Handler → browser. The route parses JSON as unknown and validates a nonempty
-`messages` array with `user`/`assistant` roles, non-whitespace string content, and
-a final user message. Invalid payloads return HTTP 400. It forwards only role and
-content in their original order, preserving Markdown/code whitespace, and normalizes
-success/error payloads. Provider details
-are neither returned nor logged. The server helper constructs the SDK client at
-request time from `process.env.OPENAI_API_KEY`, so imports/builds need no key.
-The `server-only` guard prevents client imports. The installed SDK's
-`responses.create` and `output_text` approach follows the
-[official text generation guide](https://developers.openai.com/api/docs/guides/text).
-The server selects `gpt-5.5`; the browser cannot select a model or supply credentials.
-Incomplete or empty text responses become generic failures. `store: false` avoids
-requesting response storage for later retrieval; it is not a zero-retention guarantee.
+Full history makes restored conversations usable as context but increases token
+cost and can exceed context limits. There is no truncation, summarization, streaming,
+authentication, request-size budget, or rate limiting. These are deliberate assessment
+trade-offs rather than a production deployment design.
 
-The page, `Chat`, `ChatHeader`, and `EmptyState` remain Server Components.
-`ChatConversation` is the interactive client boundary and imports `ChatMessages`
-and `ChatInput`. The empty state is passed as rendered children through a prop,
-preserving server rendering. `useChat` holds successful exchanges and
-request state; `ChatConversation` presents its results. `ChatInput` clears the draft
-immediately after valid submission, before the request resolves.
-`{ messages: [{ role, content }, ...] }` includes completed exchanges (including
-restored history) plus the latest trimmed user prompt exactly once. IDs and transient
-state are excluded. The server passes this array as Responses API `input`, following
-the [official conversation-state guide](https://developers.openai.com/api/docs/guides/conversation-state).
-There are no server sessions or previous-response IDs. Full history is resent;
-token cost grows with history and provider context limits can produce a safe error.
-The client validates the success payload before rendering user text and assistant Markdown.
-No provider or server-module imports cross into the browser.
+## State, requests, and persistence
 
-## Phase 4 client request lifecycle
+`useChat` owns messages and an idle/pending/error union. A synchronous request ref
+blocks duplicates before rerender. Input validation and request callbacks drive
+transitions; no effects watch application state to orchestrate requests. The draft
+clears immediately on valid submission. Success appends/persists the exchange;
+errors preserve completed messages and restore usable controls.
 
-`useChat` uses a discriminated union for idle, pending, and error states. Entering
-pending clears the prior error. A ref locks submission synchronously, including
-multiple calls before React rerenders. Empty prompts are rejected in the hook as
-well as the input. Success appends the exchange and returns to idle; failures
-preserve completed messages and expose only a fixed safe error message.
+A 60-second AbortController timer covers fetch and body reading. Timeout releases
+the UI immediately; identity checks ignore stale completions. Completion clears
+the timer, and an unmount effect cancels the external request and timer. Browser
+abort does not guarantee cancellation of provider work already running.
 
-Submission and request callbacks drive state transitions. Loading and error values
-are derived during render, and initial state uses simple constant values. The
-request-lifetime effect ties the network request and timer lifetime to the mounted chat:
-its unmount handler invalidates the request, aborts fetch, and clears the timer.
-It does not initiate requests or orchestrate application state.
+History begins as `null`, so server and first client render show initialization
+skeletons rather than an empty-state flash. One mount effect reads browser storage
+after hydration: lazy browser reads would mismatch server HTML. This narrow external
+synchronization has a documented lint exception. There are no layout effects.
 
-`CHAT_REQUEST_TIMEOUT_MS` is 60,000 ms. Each request has an AbortController and
-timer covering fetch and JSON body consumption. Timeout aborts the browser request,
-releases the submission lock, and displays the timeout message immediately.
-Request identity checks ignore late completions so they cannot append stale
-messages, replace an error, or unlock a newer request. Completion and unmount
-clear timers; unmount invalidates and aborts the active request.
+`storage.ts` owns `ai-chat.messages.v1`, validates fields and unique IDs, and handles
+malformed/inaccessible storage safely. Success and Clear Chat explicitly write/remove
+history outside effects and React state updaters. Only id/role/content are persisted.
+Clear Chat resets visible history, errors, and future context; it is blocked while
+pending. There is no cross-tab synchronization. Storage failures can prevent changes
+surviving refresh, but the current chat remains usable in memory.
 
-The UI keeps existing messages visible, disables conflicting input actions, and
-shows a neutral MUI message-style skeleton with a readable secondary
-"Generating response..." polite status. Errors use an alert. The server-only
-OpenAI boundary remains intact. Browser abort does not
-guarantee cancellation of provider work already running on the server.
+## Presentation and accessibility
 
-The root Server Component uses `redirect("/chat")` from `next/navigation`.
-The outer chat application is constrained to the dynamic viewport with responsive
-padding inside that height. Container and Paper share a flexible hierarchy with
-zero minimum heights. A single scroll area contains history, loading, Clear Chat,
-and errors. The three-row composer stays anchored across state transitions and
-long drafts without layout effects. Status text remains in normal document flow
-inside the constrained scroll area.
-Initialization and pending replies share rounded, neutral MUI skeletons with a
-slow pulse that is disabled for reduced-motion preferences.
+The application fits `100dvh` with responsive padding and a flex hierarchy with
+zero minimum heights. One scroll area holds messages, errors, and Clear Chat. The
+header and three-row composer stay within the panel; long drafts or skeletons do
+not grow the document. Short landscape screens use smaller outer spacing.
 
-## Phase 5 persistence and Markdown
+Initialization shows "Loading chat history..." with three rounded MUI skeletons.
+Pending requests show "Generating response..." with an assistant-style skeleton
+after existing messages. Secondary text and polite status semantics explain each
+state. Decorative skeletons are hidden from assistive technology and their pulse
+respects reduced-motion preferences. Errors use an alert.
 
-`storage.ts` owns all production LocalStorage access using `ai-chat.messages.v1`.
-It validates message fields and unique IDs, copies only id/role/content, and returns
-an empty list for missing, invalid, or inaccessible storage. Writes and removal
-fail safely so React state remains usable. Storage failures may prevent persistence
-or removal across refresh; no successful disk write is assumed.
+The labeled form supports Enter to submit, Shift + Enter for newlines, and IME
+composition. Main/header/section/article/form elements provide structure. Author
+labels use secondary captions separated from the message body.
 
-The first server and browser render both use an uninitialized (`null`) history
-and show "Loading chat history..." with three rounded message skeletons, withholding
-the empty state and disabling input.
-A mount effect reads
-browser storage after hydration; lazy LocalStorage initialization would mismatch
-server HTML. Its narrowly documented lint exception permits this external read.
-The resulting array marks initialization complete, including when storage is empty or unavailable.
-The existing request-lifetime effect still aborts on unmount. There is no effect
-watching messages to save them. Success explicitly computes the next list from a
-ref, updates React state, and saves it outside React updater functions. Clear Chat
-explicitly empties the list, removes the storage key, and resets request errors.
-Both the UI and hook prevent reset during an active request. Draft input is retained.
-Only completed user/assistant exchanges are saved; transient state is excluded.
-There is no cross-tab synchronization or server persistence. Clear Chat also removes
-the context used for future requests.
+Assistant messages use react-markdown with `skipHtml` and default URL filtering;
+user messages remain plain text. Headings, paragraphs, lists, emphasis, and links
+use semantic markup. Inline code has a neutral background; fenced blocks preserve
+whitespace and scroll horizontally within the message width. There is no raw HTML
+injection, syntax-highlighting dependency, or Markdown plugin layer.
 
-`ChatMessages` uses the installed `react-markdown` for assistant content with
-`skipHtml` and its default URL filtering. User content remains escaped plain text.
-No raw HTML or plugins are enabled. Code blocks scroll within the message width;
-headings, paragraphs, lists, emphasis, inline code, and links use semantic elements.
-Author labels use spaced secondary caption typography. Markdown paragraphs, headings,
-and lists have explicit spacing; inline code and fenced blocks use neutral backgrounds.
-Fenced code preserves whitespace and scrolls horizontally within the message width;
-links are underlined. Server/client boundaries remain unchanged.
+## Test strategy
+
+Vitest and React Testing Library cover input, loading/duplicate protection,
+failure/timeout recovery, persistence/reset, hydration, Markdown, root routing,
+and the messages-based API contract. Route tests exercise the server helper with
+the OpenAI SDK mocked; component tests mock fetch. Tests isolate LocalStorage,
+timers, and environment variables and never call the real provider.
+
+Production-build Chromium checks supplement jsdom with keyboard events, viewport
+measurements, and mocked network responses. Live-provider output, physical-device
+keyboards, and exhaustive cross-browser coverage are outside recorded verification.
+See [development](DEVELOPMENT.md) for final results.
