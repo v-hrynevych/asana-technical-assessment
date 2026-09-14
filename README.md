@@ -1,5 +1,7 @@
-﻿# AI Chat Challenge
+﻿# Live Demo
+[View deployed application on Vercel](https://asana-technical-assessment.vercel.app/chat)
 
+# AI Chat Challenge
 A small technical interview application for asking questions and continuing an AI
 conversation. Opening `/` redirects to `/chat`. Replies render without a page reload,
 and completed conversations survive refresh in the same browser.
