@@ -1,7 +1,8 @@
 # AI Chat Challenge
 
-A technical assessment for a small generative AI chat application. **Phase 1
-(project bootstrap) is implemented.** The home and `/chat` routes are placeholders.
+A technical assessment for a small generative AI chat application. **Phase 2
+(static chat UI) is implemented.** Visit `/chat` for the responsive preview.
+Send validates the input and shows a preview confirmation; no message is sent.
 
 ## Stack
 
@@ -32,8 +33,7 @@ pnpm typecheck
 ```
 
 `pnpm test:watch` starts watch mode. `pnpm start` serves a completed production
-build. The current test checks the MUI/App Router testing infrastructure; chat
-behavior tests belong to later phases.
+build. Tests cover the MUI/App Router infrastructure and basic chat input behavior.
 
 ## Architecture and remaining work
 
@@ -42,9 +42,9 @@ and types will be colocated in private folders under `app/chat/`. The planned
 backend is a Next.js Route Handler calling OpenAI exclusively on the server.
 No separate backend or global state library is needed.
 
-Later phases add the chat form, AI responses, validation, loading and error states,
-timeouts, persistence, Clear Chat, Markdown rendering, and behavior tests. None of
-these features are implemented yet.
+Later phases add AI responses, API validation, loading and error states,
+timeouts, persistence, Clear Chat, Markdown rendering, and further behavior tests.
+These features are not implemented yet.
 
 See [architecture](docs/ARCHITECTURE.md), [development status](docs/DEVELOPMENT.md),
 and [repository instructions](AGENTS.md).

@@ -20,8 +20,8 @@ app/
   globals.css                Minimal global defaults
   page.tsx                   Bootstrap placeholder
   chat/
-    page.tsx                 Chat route placeholder
-    _components/             Reserved for chat UI
+    page.tsx                 Server-rendered chat composition
+    _components/             Chat layout, header, empty message area, and input
     _hooks/                  Reserved for chat behavior
     _lib/                    Reserved for chat utilities
     _types/                  Reserved for chat types
@@ -30,14 +30,24 @@ lib/                         Reserved for shared server infrastructure
 tests/
   setup.ts                   DOM matchers and cleanup
   bootstrap.test.tsx         MUI/React rendering infrastructure smoke test
-  chat/                      Reserved for chat behavior tests
+  chat/                      Basic input component tests
 docs/                        Architecture and implementation status
 ```
 
 Empty directories contain `.gitkeep` files so Git preserves them. Feature files
-such as `ChatInput.tsx`, `useChat.ts`, `storage.ts`, `lib/openai.ts`, and
+such as `useChat.ts`, `storage.ts`, `lib/openai.ts`, and
 `app/api/chat/route.ts` are intentionally deferred. Loading and error boundaries
 will be added with their corresponding behavior rather than as nonfunctional stubs.
+
+## Phase 2 UI boundary
+
+`Chat`, `ChatHeader`, `ChatMessages`, and `EmptyState` remain Server Components.
+Only `ChatInput` declares an application client boundary for draft input, keyboard
+events, and a preview confirmation. Its optional submit callback provides a test
+seam; the server page passes no function across the boundary. Submission keeps the
+draft and confirms that nothing was sent. The conversation area stays static.
+MUI primitives supply responsive styling within the existing cache provider.
+No chat hook, request, or message history is introduced.
 
 ## Planned boundaries (not implemented)
 

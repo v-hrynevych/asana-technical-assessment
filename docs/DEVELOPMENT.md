@@ -6,11 +6,11 @@
 | --- | --- |
 | 0 — Planning | Requirements and architecture defined in root AGENTS.md |
 | 1 — Project Bootstrap | Complete; required checks passed |
-| 2 — Static Chat UI | Not started |
+| 2 — Static Chat UI | Complete; required checks passed |
 | 3 — AI Integration | Not started |
 | 4 — Application State | Not started |
 | 5 — Bonus Features | Not started |
-| 6 — Testing | Not started; infrastructure smoke test only in Phase 1 |
+| 6 — Testing | Not started; infrastructure and basic input tests exist from Phases 1–2 |
 | 7 — Final Quality Review | Not started |
 | 8 — Submission | Not started |
 
@@ -63,3 +63,53 @@ Remaining installation warnings:
 
 Phase 1 ends here. No chat UI, API request flow, LocalStorage, or Markdown
 rendering has been implemented. Phase 2 requires a separate task.
+
+## Phase 2 — Static Chat UI
+
+Implemented `/chat` with a responsive MUI container, header, static conversation
+region, empty state, labeled multiline input, and Send button. Mobile controls
+stack vertically; tablet and desktop controls share a row inside a bounded
+container. Content can grow vertically without a fixed-height clipping region.
+
+The page and presentation components remain Server Components. Only `ChatInput`
+uses a client boundary for draft text and a preview-only submission confirmation.
+It retains the draft and does not append messages or call any service. Empty and
+whitespace-only prompts are rejected. Enter submits, Shift + Enter preserves
+native newline behavior, and IME composition does not trigger submission.
+Semantic main/header/section/form elements, a visible input label, keyboard help,
+a named button, heading hierarchy, and a polite status announcement support
+keyboard and screen-reader use.
+
+Files added:
+
+- `app/chat/_components/Chat.tsx`
+- `app/chat/_components/ChatHeader.tsx`
+- `app/chat/_components/ChatMessages.tsx`
+- `app/chat/_components/EmptyState.tsx`
+- `app/chat/_components/ChatInput.tsx`
+- `tests/chat/ChatInput.test.tsx`
+
+Files modified: `app/chat/page.tsx`, `README.md`, `docs/ARCHITECTURE.md`, and
+`docs/DEVELOPMENT.md`. No files deleted or dependencies added.
+
+Validation on 2026-09-13, using `corepack pnpm`:
+
+| Command | Result |
+| --- | --- |
+| `pnpm lint` | Passed; zero warnings |
+| `pnpm test` | Passed; 5 tests across 2 files, including 4 Phase 2 input tests |
+| `pnpm build` | Passed; `/chat` statically prerendered |
+| `pnpm exec tsc --noEmit` | Passed |
+| `git status` / `git diff` / `git diff --check` | Reviewed; no whitespace errors |
+
+The sandbox blocked test/build subprocesses with `spawn EPERM`; approved retries
+ran successfully. The initial type check caught an unsupported MUI `alignItems`
+prop on Stack; moving it into `sx` fixed the issue, and all checks were rerun.
+No new validation warnings remain. Existing dependency warnings recorded under
+Phase 1 are unchanged. Responsive styles were reviewed in source; manual browser
+verification on mobile, tablet, and desktop remains outstanding. The Shift + Enter
+test checks that the event is not prevented and multiline values are retained;
+jsdom does not emulate native textarea newline insertion.
+
+Phase 2 ends here. Phases 3–8 remain unimplemented; no API integration, fetch,
+chat business hook, persistence, Markdown, request state, or timeout was added.
