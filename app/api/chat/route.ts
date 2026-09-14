@@ -1,5 +1,11 @@
 import { generateReply } from "@/lib/openai";
-import type { ChatError, ChatResponse } from "@/app/chat/_types/chat";
+import type { ChatError, ChatResponse, ConversationMessage } from "@/app/chat/_types/chat";
+
+function isConversationMessage(value: unknown): value is ConversationMessage {
+  return typeof value === "object" && value !== null && !Array.isArray(value) &&
+    "role" in value && (value.role === "user" || value.role === "assistant") &&
+    "content" in value && typeof value.content === "string" && !!value.content.trim();
+}
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -16,21 +22,23 @@ export async function POST(request: Request) {
     typeof body !== "object" ||
     body === null ||
     Array.isArray(body) ||
-    !("prompt" in body) ||
-    typeof body.prompt !== "string" ||
-    !body.prompt.trim()
+    !("messages" in body) ||
+    !Array.isArray(body.messages) ||
+    body.messages.length === 0 ||
+    !body.messages.every(isConversationMessage) ||
+    body.messages.at(-1)?.role !== "user"
   ) {
     return Response.json(
-      { error: "Please enter a message." } satisfies ChatError,
+      { error: "Please send a valid conversation ending with a user message." } satisfies ChatError,
       { status: 400 },
     );
   }
 
   try {
-    const message = await generateReply(body.prompt.trim());
+    const messages = body.messages.map(({ role, content }) => ({ role, content }));
+    const message = await generateReply(messages);
     return Response.json({ message } satisfies ChatResponse);
-  } catch (error) {
-    console.error("generateReply failed:", error);
+  } catch {
     return Response.json(
       {
         error: "Unable to get a response. Please try again.",

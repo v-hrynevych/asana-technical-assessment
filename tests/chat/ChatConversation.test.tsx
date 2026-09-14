@@ -26,7 +26,10 @@ it("shows a safe error and permits another submission after an API failure", asy
 });
 
 it("shows loading, blocks submissions, and restores controls after success", async () => {
-  saveMessages([{ id: "saved", role: "assistant", content: "Previous reply" }]);
+  saveMessages([
+    { id: "saved-user", role: "user", content: "My favorite color is blue." },
+    { id: "saved", role: "assistant", content: "Previous reply" },
+  ]);
   const savedHistory = localStorage.getItem(CHAT_STORAGE_KEY);
   let resolveRequest!: (response: Response) => void;
   const fetchMock = vi.fn().mockReturnValue(new Promise<Response>((resolve) => { resolveRequest = resolve; }));
@@ -34,8 +37,15 @@ it("shows loading, blocks submissions, and restores controls after success", asy
   render(<ChatConversation emptyState={<p>Start a conversation</p>} />);
   fireEvent.change(screen.getByRole("textbox"), { target: { value: "Hello" } });
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
-  expect(screen.getByRole("status")).toHaveTextContent("Waiting for a reply");
-  expect(screen.getByRole("status")).toHaveTextContent("Assistant");
+  expect(screen.getByRole("status")).toHaveTextContent("Generating response...");
+  expect(screen.getByText("Generating response...")).toBeVisible();
+  expect(fetchMock).toHaveBeenCalledWith("/api/chat", expect.objectContaining({
+    body: JSON.stringify({ messages: [
+      { role: "user", content: "My favorite color is blue." },
+      { role: "assistant", content: "Previous reply" },
+      { role: "user", content: "Hello" },
+    ] }),
+  }));
   expect(screen.getByRole("status").querySelector(".MuiSkeleton-rounded")).toBeInTheDocument();
   expect(screen.getByRole("region", { name: "Conversation" })).toContainElement(screen.getByRole("status"));
   expect(screen.getByText("Previous reply")).toBeVisible();
@@ -52,6 +62,19 @@ it("shows loading, blocks submissions, and restores controls after success", asy
   expect(screen.getByRole("status")).toBeEmptyDOMElement();
   expect(screen.getByRole("textbox")).toBeEnabled();
   expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+  fetchMock.mockResolvedValueOnce(Response.json({ message: "Next reply" }));
+  fireEvent.change(screen.getByRole("textbox"), { target: { value: "Next question" } });
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  expect(fetchMock).toHaveBeenLastCalledWith("/api/chat", expect.objectContaining({
+    body: JSON.stringify({ messages: [
+      { role: "user", content: "My favorite color is blue." },
+      { role: "assistant", content: "Previous reply" },
+      { role: "user", content: "Hello" },
+      { role: "assistant", content: "Reply" },
+      { role: "user", content: "Next question" },
+    ] }),
+  }));
+  expect(await screen.findByText("Next reply")).toBeVisible();
 });
 
 it("shows a timeout and allows retry while ignoring a late response", async () => {

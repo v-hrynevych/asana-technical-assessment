@@ -40,8 +40,11 @@ will be added with their corresponding behavior rather than as nonfunctional stu
 ## Phase 3 request flow and boundaries
 
 Browser → `POST /api/chat` → `lib/openai.ts` → OpenAI Responses API →
-Route Handler → browser. The route parses JSON as unknown, validates a nonempty
-string prompt, trims it, and normalizes success/error payloads. Provider details
+Route Handler → browser. The route parses JSON as unknown and validates a nonempty
+`messages` array with `user`/`assistant` roles, non-whitespace string content, and
+a final user message. Invalid payloads return HTTP 400. It forwards only role and
+content in their original order, preserving Markdown/code whitespace, and normalizes
+success/error payloads. Provider details
 are neither returned nor logged. The server helper constructs the SDK client at
 request time from `process.env.OPENAI_API_KEY`, so imports/builds need no key.
 The `server-only` guard prevents client imports. The installed SDK's
@@ -57,7 +60,12 @@ and `ChatInput`. The empty state is passed as rendered children through a prop,
 preserving server rendering. `useChat` holds successful exchanges and
 request state; `ChatConversation` presents its results. `ChatInput` clears the draft
 immediately after valid submission, before the request resolves.
-Only `{ prompt }` is sent, so each request is independent of displayed exchanges.
+`{ messages: [{ role, content }, ...] }` includes completed exchanges (including
+restored history) plus the latest trimmed user prompt exactly once. IDs and transient
+state are excluded. The server passes this array as Responses API `input`, following
+the [official conversation-state guide](https://developers.openai.com/api/docs/guides/conversation-state).
+There are no server sessions or previous-response IDs. Full history is resent;
+token cost grows with history and provider context limits can produce a safe error.
 The client validates the success payload before rendering user text and assistant Markdown.
 No provider or server-module imports cross into the browser.
 
@@ -83,9 +91,9 @@ messages, replace an error, or unlock a newer request. Completion and unmount
 clear timers; unmount invalidates and aborts the active request.
 
 The UI keeps existing messages visible, disables conflicting input actions, and
-shows a neutral MUI message-style skeleton with a visually hidden polite status
-message. Errors use an alert. The API
-contract and server-only OpenAI integration are unchanged. Browser abort does not
+shows a neutral MUI message-style skeleton with a readable secondary
+"Generating response..." polite status. Errors use an alert. The server-only
+OpenAI boundary remains intact. Browser abort does not
 guarantee cancellation of provider work already running on the server.
 
 The root Server Component uses `redirect("/chat")` from `next/navigation`.
@@ -93,8 +101,8 @@ The outer chat application is constrained to the dynamic viewport with responsiv
 padding inside that height. Container and Paper share a flexible hierarchy with
 zero minimum heights. A single scroll area contains history, loading, Clear Chat,
 and errors. The three-row composer stays anchored across state transitions and
-long drafts without layout effects. Hidden status text uses explicit pixel sizing
-to avoid MUI's percentage interpretation of numeric dimensions.
+long drafts without layout effects. Status text remains in normal document flow
+inside the constrained scroll area.
 Initialization and pending replies share rounded, neutral MUI skeletons with a
 slow pulse that is disabled for reduced-motion preferences.
 
@@ -107,7 +115,8 @@ fail safely so React state remains usable. Storage failures may prevent persiste
 or removal across refresh; no successful disk write is assumed.
 
 The first server and browser render both use an uninitialized (`null`) history
-and show three rounded message skeletons, withholding the empty state and disabling input.
+and show "Loading chat history..." with three rounded message skeletons, withholding
+the empty state and disabling input.
 A mount effect reads
 browser storage after hydration; lazy LocalStorage initialization would mismatch
 server HTML. Its narrowly documented lint exception permits this external read.
@@ -118,10 +127,14 @@ ref, updates React state, and saves it outside React updater functions. Clear Ch
 explicitly empties the list, removes the storage key, and resets request errors.
 Both the UI and hook prevent reset during an active request. Draft input is retained.
 Only completed user/assistant exchanges are saved; transient state is excluded.
-There is no cross-tab synchronization or server history, and requests remain independent.
+There is no cross-tab synchronization or server persistence. Clear Chat also removes
+the context used for future requests.
 
 `ChatMessages` uses the installed `react-markdown` for assistant content with
 `skipHtml` and its default URL filtering. User content remains escaped plain text.
 No raw HTML or plugins are enabled. Code blocks scroll within the message width;
 headings, paragraphs, lists, emphasis, inline code, and links use semantic elements.
-Server/client boundaries and the Phase 3 API contract are unchanged.
+Author labels use spaced secondary caption typography. Markdown paragraphs, headings,
+and lists have explicit spacing; inline code and fenced blocks use neutral backgrounds.
+Fenced code preserves whitespace and scrolls horizontally within the message width;
+links are underlined. Server/client boundaries remain unchanged.

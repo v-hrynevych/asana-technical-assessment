@@ -360,30 +360,51 @@ contained overflow. One internally scrollable conversation area is shared by
 initialization, empty, pending, and restored states. The composer uses three rows
 so long drafts and submission do not change its height. History, Clear Chat,
 errors, and skeletons cannot grow the document or push the composer down.
-Hidden status announcements use explicit one-pixel dimensions (numeric `1` in
-MUI sizing means 100%). No layout effects or fixed pixel full-page heights are used.
+Readable status text stays inside the constrained message area. No layout effects
+or fixed pixel full-page heights are used.
 
 The root Server Component calls Next.js `redirect("/chat")`; `/chat` is the canonical
 UI route. There is no separate landing page, client redirect, or duplicate chat UI.
 
 Pending replies display a rounded MUI Skeleton after existing messages inside the
 conversation area. Both loading states use soft theme gray, a slow subtle pulse,
-and visually hidden polite status announcements. Reduced-motion preferences disable
+and readable secondary status text with polite live announcements:
+"Loading chat history..." during restoration and "Generating response..." during
+an accepted AI request. Reduced-motion preferences disable
 the pulse. Decorative skeletons are hidden from assistive technology.
 Previous messages stay visible; loading is never serialized. Server boundaries,
-OpenAI integration, timeout, safe client errors, duplicate protection, Clear Chat,
+server-only OpenAI integration, timeout, safe client errors, duplicate protection, Clear Chat,
 persistence, and Markdown rendering are preserved. No dependencies were added.
 
-The suite contains 12 tests across 6 files, including one root redirect test.
+Author labels use secondary caption typography with spacing above the message body.
+Assistant Markdown has explicit paragraph/heading/list spacing, emphasis, neutral
+inline code, distinct fenced blocks preserving whitespace with horizontal scrolling,
+and underlined links. User content remains plain text. No syntax-highlighting library.
+
+The API accepts `{ messages: [{ role, content }, ...] }`. Each request includes all
+completed user/assistant exchanges in order, including LocalStorage-restored history,
+followed by the newest user message exactly once. IDs, loading, and errors are excluded.
+The route validates a nonempty array, supported roles, non-whitespace string content,
+and a final user message; malformed JSON/payloads return HTTP 400. It strips extra
+fields and preserves content whitespace before passing the array as Responses API
+`input`. The existing model and `store: false` setting remain unchanged. Provider
+failures return generic errors without raw exception logging. Clear Chat removes
+future request context. There are no server sessions, streaming, or new dependencies.
+Full history is resent; large conversations may hit provider context limits.
+
+The suite contains 14 tests across 7 files, including one root redirect test.
 Existing input/request tests cover
 immediate clearing, invalid draft preservation, keyboard behavior, retained history
 during loading, transient-state exclusion, and recovery. One additional hydration
 test verifies three initialization skeletons, no empty-state render while history
 restores, and no recoverable hydration errors. The request test verifies an
-assistant skeleton inside the conversation while prior messages remain visible.
+assistant skeleton and readable status inside the conversation while prior messages
+remain visible, and exact ordered restored context in the outbound payload. Route
+tests verify malformed conversations, preserved SDK input, and safe provider failures;
+one Markdown test checks semantic rendering, code whitespace, and plain user content.
 
 Validation using `corepack pnpm` (the available pnpm launcher): `pnpm lint`,
-`pnpm test` (12 tests), `pnpm build`, and `pnpm exec tsc --noEmit` passed.
+`pnpm test` (14 tests), `pnpm build`, and `pnpm exec tsc --noEmit` passed.
 Git status and diff were reviewed, including whitespace checks. Vitest required
 approved execution outside the sandbox because subprocess startup returned EPERM.
 
@@ -392,9 +413,13 @@ Headless Chrome checks against the production build passed at 1440×900, 768×10
 initialization skeletons, empty chat, an 80-line draft, pending skeleton, long mocked
 reply, and refresh with 30 persisted messages. Document height equaled viewport
 height; composer coordinates stayed stable; overflowing history had exactly one
-vertical scroll container. Browser requests were mocked; no live provider calls.
+vertical scroll container. Presentation checks at the same sizes confirmed readable
+loading text with skeletons, ordered restored context in outgoing requests, and wide
+fenced code scrolling horizontally without document overflow. Desktop/mobile
+screenshots were visually reviewed for author labels and Markdown spacing.
+Browser requests were mocked; no live provider calls or live conversation-memory
+answers were verified. Client request capture and mocked SDK assertions verify the
+context transport end to end.
 Physical-device keyboard behavior, visual animation review, and live-provider
 verification remain outstanding.
-Existing dependency warnings from Phase 1 remain unchanged. Source review also
-found existing raw exception logging in `app/api/chat/route.ts`; its sanitization
-remains unresolved outside these UX fixes. Phase 8 has not started.
+Existing dependency warnings from Phase 1 remain unchanged. Phase 8 has not started.

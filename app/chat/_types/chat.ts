@@ -1,5 +1,5 @@
 export interface ChatRequest {
-  prompt: string;
+  messages: ConversationMessage[];
 }
 
 export interface ChatResponse {
@@ -10,8 +10,11 @@ export interface ChatError {
   error: string;
 }
 
-export interface ChatMessage {
-  id: string;
+export interface ConversationMessage {
   role: "user" | "assistant";
   content: string;
+}
+
+export interface ChatMessage extends ConversationMessage {
+  id: string;
 }

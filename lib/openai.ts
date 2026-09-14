@@ -1,14 +1,15 @@
 import "server-only";
 import OpenAI from "openai";
+import type { ConversationMessage } from "@/app/chat/_types/chat";
 
-export async function generateReply(prompt: string): Promise<string> {
+export async function generateReply(messages: ConversationMessage[]): Promise<string> {
   // Construct at request time so builds do not require credentials.
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey?.trim()) throw new Error("Missing API configuration");
   const client = new OpenAI({ apiKey });
   const response = await client.responses.create({
     model: "gpt-5.5",
-    input: prompt,
+    input: messages,
     store: false,
   });
 

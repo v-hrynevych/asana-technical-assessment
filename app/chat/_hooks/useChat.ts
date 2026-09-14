@@ -70,7 +70,12 @@ export default function useChat() {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt } satisfies ChatRequest),
+        body: JSON.stringify({
+          messages: [
+            ...currentMessages.current.map(({ role, content }) => ({ role, content })),
+            { role: "user", content: prompt },
+          ],
+        } satisfies ChatRequest),
         signal: controller.signal,
       });
       if (activeRequest.current !== request) return;

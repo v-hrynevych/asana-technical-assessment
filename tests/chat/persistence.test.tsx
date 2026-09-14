@@ -12,7 +12,7 @@ it("shows initialization feedback until persisted history hydrates without an em
   saveMessages([{ id: "1", role: "assistant", content: "Saved reply" }]);
   const container = document.createElement("div");
   container.innerHTML = renderToString(chat);
-  expect(container.textContent).toContain("Loading chat history");
+  expect(container.textContent).toContain("Loading chat history...");
   expect(container.querySelector('[role="status"]')?.querySelectorAll(".MuiSkeleton-rounded")).toHaveLength(3);
   expect(container.textContent).not.toContain("Empty chat");
   const emptyStateRendered = vi.fn(() => <p>Empty chat</p>);
