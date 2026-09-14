@@ -9,8 +9,8 @@
 | 2 — Static Chat UI | Complete; required checks passed |
 | 3 — AI Integration | Complete; required checks passed |
 | 4 — Application State | Complete; required checks passed |
-| 5 — Bonus Features | Not started |
-| 6 — Testing | Not started; focused tests accompany Phases 1–4 |
+| 5 — Bonus Features | Complete; required checks passed |
+| 6 — Testing | Not started; focused tests accompany Phases 1–5 |
 | 7 — Final Quality Review | Not started |
 | 8 — Submission | Not started |
 
@@ -256,3 +256,67 @@ Tests require execution outside this environment's sandbox because it blocks
 Vitest subprocess startup. Existing dependency warnings remain as recorded in
 Phase 1. Manual browser verification and live provider verification remain
 outstanding. Phase 4 ends here; Phases 5–8 remain incomplete.
+
+## Phase 5 — Bonus Features
+
+Successful user/assistant exchanges persist in browser LocalStorage and restore
+after refresh. `storage.ts` validates stored messages (including unique IDs), strips
+extra fields, and safely handles malformed JSON, invalid data, missing storage,
+blocked access, quota errors, and server execution. Only id, role, and content
+are serialized; request status, errors, controllers, and timers stay in memory.
+
+An external-storage mount effect reads history after hydration to keep server HTML
+and the first client render identical. This is a documented, narrow exception to
+the state-in-effect lint rule; lazy browser reads would cause hydration mismatch.
+The existing request-lifetime effect handles unmount cancellation. Persistence
+is explicit in successful-submit and clear actions, never in an effect watching
+messages or in a React state updater. A message ref keeps action updates current.
+
+Clear Chat appears when history exists. It removes visible and stored messages,
+clears request errors, and retains the draft input. The button and hook both block
+reset while a request is active. The Phase 4 timeout, late-response guards, loading,
+error, and duplicate-submit behavior remain intact. If storage is unavailable,
+the chat works in memory; persistence/removal across refresh cannot be guaranteed.
+
+Assistant messages render with the installed `react-markdown`, raw HTML skipped,
+default URL filtering, and no plugins. User messages remain plain text. Common
+Markdown is supported and code blocks scroll within the responsive message area.
+No new dependencies, server history, streaming, or Phase 6 features were added.
+
+Created:
+
+- `app/chat/_lib/storage.ts`
+- `tests/chat/storage.test.ts`
+- `tests/chat/persistence.test.tsx`
+- `tests/chat/ChatMessages.test.tsx`
+
+Modified:
+
+- `app/chat/_hooks/useChat.ts`
+- `app/chat/_components/ChatConversation.tsx`
+- `app/chat/_components/ChatMessages.tsx`
+- `tests/chat/ChatConversation.test.tsx`
+- `tests/chat/useChat.test.tsx`
+- `tests/setup.ts`
+- `README.md`, `docs/ARCHITECTURE.md`, `docs/DEVELOPMENT.md`
+
+No files deleted. Tests isolate LocalStorage between cases and mock fetch/OpenAI.
+Coverage includes save/restore, invalid data, blocked storage, quota failure, SSR,
+hydration without mismatch, visible/persisted reset, error removal, reset disabling,
+Markdown structure, and unsafe HTML/links. The existing completed-request timer
+test verifies no timeout error after the deadline instead of counting React's timers.
+
+Validation on 2026-09-14 using `corepack pnpm`:
+
+| Command | Result |
+| --- | --- |
+| `pnpm lint` | Passed; zero warnings |
+| `pnpm test` | Passed; 45 tests in 8 files |
+| `pnpm build` | Passed |
+| `pnpm exec tsc --noEmit` | Passed |
+| `git status` / `git diff` / `git diff --check` | Reviewed; no whitespace errors |
+
+Tests ran with approved execution outside the sandbox because of its documented
+Vitest subprocess restriction. Existing dependency warnings remain unchanged;
+no new validation warnings. Live provider and manual browser layout verification
+remain outstanding. Phase 5 ends here; Phases 6–8 remain incomplete.

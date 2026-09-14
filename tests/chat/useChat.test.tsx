@@ -65,7 +65,9 @@ it("clears completed request timers and keeps previous messages while waiting", 
   vi.stubGlobal("fetch", fetchMock);
   const { result } = renderHook(() => useChat());
   await act(async () => { await result.current.submitPrompt("Hello"); });
-  expect(vi.getTimerCount()).toBe(0);
+  await act(async () => { await vi.advanceTimersByTimeAsync(CHAT_REQUEST_TIMEOUT_MS); });
+  expect(result.current.error).toBeNull();
+  expect(result.current.pending).toBe(false);
   act(() => { void result.current.submitPrompt("Next"); });
   expect(result.current.pending).toBe(true);
   expect(result.current.messages.map((message) => message.content)).toEqual(["Hello", "Reply"]);

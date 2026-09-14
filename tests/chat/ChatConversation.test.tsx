@@ -5,7 +5,7 @@ import { CHAT_REQUEST_TIMEOUT_MS } from "@/app/chat/_hooks/useChat";
 
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
-it("posts the prompt internally and renders the assistant reply as plain text", async () => {
+it("posts the prompt internally and renders the assistant reply as Markdown", async () => {
   const fetchMock = vi.fn().mockResolvedValue(Response.json({ message: "**Hello** from AI" }));
   vi.stubGlobal("fetch", fetchMock);
   render(<ChatConversation emptyState={<p>Start a conversation</p>} />);
@@ -15,7 +15,7 @@ it("posts the prompt internally and renders the assistant reply as plain text", 
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: "Hello" }),
     signal: expect.any(AbortSignal),
   });
-  expect(await screen.findByText("**Hello** from AI")).toBeVisible();
+  expect(await screen.findByText("Hello", { selector: "strong" })).toBeVisible();
   expect(screen.getByRole("article", { name: "Your message" })).toHaveTextContent("Hello");
   expect(screen.queryByText("Start a conversation")).not.toBeInTheDocument();
   await waitFor(() => expect(screen.getByRole("button", { name: "Send" })).toBeEnabled());

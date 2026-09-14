@@ -23,7 +23,7 @@ app/
     page.tsx                 Server-rendered chat composition
     _components/             Chat layout, header, empty message area, and input
     _hooks/useChat.ts         Client request lifecycle and in-memory messages
-    _lib/                    Reserved for chat utilities
+    _lib/storage.ts          Validated browser history read/save/remove helpers
     _types/                  Chat payload and message types
   api/chat/route.ts          POST validation and normalized JSON responses
 lib/openai.ts                Server-only OpenAI Responses API call
@@ -34,8 +34,7 @@ tests/
 docs/                        Architecture and implementation status
 ```
 
-Empty directories contain `.gitkeep` files so Git preserves them. Feature files
-such as `storage.ts` are intentionally deferred. Loading and error boundaries
+Empty directories contain `.gitkeep` files so Git preserves them. Loading and error boundaries
 will be added with their corresponding behavior rather than as nonfunctional stubs.
 
 ## Phase 3 request flow and boundaries
@@ -55,11 +54,11 @@ requesting response storage for later retrieval; it is not a zero-retention guar
 The page, `Chat`, `ChatHeader`, and `EmptyState` remain Server Components.
 `ChatConversation` is the interactive client boundary and imports `ChatMessages`
 and `ChatInput`. The empty state is passed as rendered children through a prop,
-preserving server rendering. `useChat` holds successful plain-text exchanges and
+preserving server rendering. `useChat` holds successful exchanges and
 request state; `ChatConversation` presents its results. The draft is retained in
 `ChatInput` for retry or editing.
 Only `{ prompt }` is sent, so each request is independent of displayed exchanges.
-The client validates the success payload before rendering it as escaped React text.
+The client validates the success payload before rendering user text and assistant Markdown.
 No provider or server-module imports cross into the browser.
 
 ## Phase 4 client request lifecycle
@@ -72,7 +71,7 @@ preserve messages and draft text and expose only a fixed safe error message.
 
 Submission and request callbacks drive state transitions. Loading and error values
 are derived during render, and initial state uses simple constant values. The
-single effect ties the network request and timer lifetime to the mounted chat:
+request-lifetime effect ties the network request and timer lifetime to the mounted chat:
 its unmount handler invalidates the request, aborts fetch, and clears the timer.
 It does not initiate requests or orchestrate application state.
 
@@ -88,9 +87,27 @@ shows an MUI spinner with a polite status message. Errors use an alert. The API
 contract and server-only OpenAI integration are unchanged. Browser abort does not
 guarantee cancellation of provider work already running on the server.
 
-## Planned boundaries (not implemented)
+## Phase 5 persistence and Markdown
 
-Browser persistence will be isolated in `app/chat/_lib/storage.ts`, and Markdown will be
-rendered only for assistant messages. These are later-phase decisions, not current
-capabilities. Persistence and Markdown are not implemented. SDK default
-request/retry behavior remains unchanged.
+`storage.ts` owns all production LocalStorage access using `ai-chat.messages.v1`.
+It validates message fields and unique IDs, copies only id/role/content, and returns
+an empty list for missing, invalid, or inaccessible storage. Writes and removal
+fail safely so React state remains usable. Storage failures may prevent persistence
+or removal across refresh; no successful disk write is assumed.
+
+The first server and browser render both use empty history. A mount effect reads
+browser storage after hydration; lazy LocalStorage initialization would mismatch
+server HTML. Its narrowly documented lint exception permits this external read.
+The existing request-lifetime effect still aborts on unmount. There is no effect
+watching messages to save them. Success explicitly computes the next list from a
+ref, updates React state, and saves it outside React updater functions. Clear Chat
+explicitly empties the list, removes the storage key, and resets request errors.
+Both the UI and hook prevent reset during an active request. Draft input is retained.
+Only completed user/assistant exchanges are saved; transient state is excluded.
+There is no cross-tab synchronization or server history, and requests remain independent.
+
+`ChatMessages` uses the installed `react-markdown` for assistant content with
+`skipHtml` and its default URL filtering. User content remains escaped plain text.
+No raw HTML or plugins are enabled. Code blocks scroll within the message width;
+headings, paragraphs, lists, emphasis, inline code, and links use semantic elements.
+Server/client boundaries and the Phase 3 API contract are unchanged.

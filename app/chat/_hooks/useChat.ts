@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ChatMessage, ChatRequest } from "../_types/chat";
+import { clearMessages, loadMessages, saveMessages } from "../_lib/storage";
 
 export const CHAT_REQUEST_TIMEOUT_MS = 60_000;
 
@@ -19,7 +20,17 @@ export default function useChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [requestState, setRequestState] = useState<RequestState>({ status: "idle" });
   const activeRequest = useRef<ActiveRequest | null>(null);
+  const currentMessages = useRef<ChatMessage[]>([]);
 
+  useEffect(() => {
+    // Read browser storage after hydration; lazy initialization would mismatch SSR.
+    const restored = loadMessages();
+    currentMessages.current = restored;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Synchronize with browser-only storage after hydration.
+    setMessages(restored);
+  }, []);
+
+  // Tie the external request and timer lifetime to the mounted chat instance.
   useEffect(() => () => {
     const request = activeRequest.current;
     activeRequest.current = null;
@@ -28,6 +39,14 @@ export default function useChat() {
       request.controller.abort();
     }
   }, []);
+
+  function clearChat() {
+    if (activeRequest.current) return;
+    currentMessages.current = [];
+    setMessages([]);
+    clearMessages();
+    setRequestState({ status: "idle" });
+  }
 
   async function submitPrompt(value: string) {
     const prompt = value.trim();
@@ -66,7 +85,10 @@ export default function useChat() {
         { id: crypto.randomUUID(), role: "user", content: prompt },
         { id: crypto.randomUUID(), role: "assistant", content: data.message },
       ];
-      setMessages((previous) => [...previous, ...exchange]);
+      const nextMessages = [...currentMessages.current, ...exchange];
+      currentMessages.current = nextMessages;
+      setMessages(nextMessages);
+      saveMessages(nextMessages);
       setRequestState({ status: "idle" });
     } catch {
       if (activeRequest.current === request) {
@@ -84,5 +106,6 @@ export default function useChat() {
     pending: requestState.status === "pending",
     error: requestState.status === "error" ? requestState.message : null,
     submitPrompt,
+    clearChat,
   };
 }

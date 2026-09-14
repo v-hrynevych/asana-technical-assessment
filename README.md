@@ -1,13 +1,13 @@
 # AI Chat Challenge
 
-A technical assessment for a small generative AI chat application. **Phase 4
-(application state) is implemented.** Visit `/chat` to submit a prompt and receive
-a plain-text AI response without reloading the page.
+A technical assessment for a small generative AI chat application. **Phase 5
+(bonus features) is implemented.** Visit `/chat` for AI replies with Markdown,
+browser-persisted history, and Clear Chat.
 
 ## Stack
 
 Next.js App Router, React, strict TypeScript, pnpm, and Material UI with Emotion.
-The OpenAI SDK handles server requests; react-markdown is reserved for later. Testing uses Vitest,
+The OpenAI SDK handles server requests; react-markdown renders assistant replies. Testing uses Vitest,
 React Testing Library, jest-dom, and jsdom; linting uses ESLint's Next.js presets.
 
 ## Local setup
@@ -37,7 +37,7 @@ pnpm typecheck
 `pnpm test:watch` starts watch mode. `pnpm start` serves a completed production
 build. Tests cover input behavior, API validation, mocked OpenAI calls, safe errors,
 dynamic rendering, loading, duplicate prevention, timeout, and retry using mocked
-fetch responses. They never call the real API.
+fetch responses, plus storage, hydration, reset, and Markdown safety. They never call the real API.
 
 ## Architecture and remaining work
 
@@ -49,13 +49,17 @@ No separate backend or global state library is needed.
 `POST /api/chat` accepts `{ "prompt": "..." }` and returns `{ "message": "..." }`.
 Invalid input returns HTTP 400; provider/configuration failures return HTTP 500
 with a safe `{ "error": "..." }` payload. A `server-only` import guard protects the
-OpenAI module. Only the current prompt is sent; displayed exchanges exist in
-memory and disappear on refresh. The SDK request sets `store: false`.
+OpenAI module. Only the current prompt is sent; displayed exchanges are restored
+from this browser's LocalStorage after refresh. The SDK request sets `store: false`.
+Clear Chat removes saved and visible history and is disabled during requests.
+If storage is blocked or full, the chat still works in memory. User messages remain
+plain text; assistant Markdown supports headings, lists, emphasis, code, and links
+without raw HTML. History is not sent as context or stored by the application server.
 
 The chat hook prevents duplicate submissions and aborts browser requests after
 60 seconds. Loading feedback and safe errors keep the flow usable; failed or
 timed-out requests can be retried with the retained draft.
-Later phases add persistence, Clear Chat, Markdown rendering, and further tests.
+Remaining phases cover broader testing, final quality review, and submission.
 
 See [architecture](docs/ARCHITECTURE.md), [development status](docs/DEVELOPMENT.md),
 and [repository instructions](AGENTS.md).
