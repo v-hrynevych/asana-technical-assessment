@@ -18,7 +18,7 @@ ESLint runs separately from the production build, as described in the
 app/
   layout.tsx                 Root document and MUI cache integration
   globals.css                Minimal global defaults
-  page.tsx                   Bootstrap placeholder
+  page.tsx                   Server redirect to canonical /chat route
   chat/
     page.tsx                 Server-rendered chat composition
     _components/             Chat layout, header, empty message area, and input
@@ -55,8 +55,8 @@ The page, `Chat`, `ChatHeader`, and `EmptyState` remain Server Components.
 `ChatConversation` is the interactive client boundary and imports `ChatMessages`
 and `ChatInput`. The empty state is passed as rendered children through a prop,
 preserving server rendering. `useChat` holds successful exchanges and
-request state; `ChatConversation` presents its results. The draft is retained in
-`ChatInput` for retry or editing.
+request state; `ChatConversation` presents its results. `ChatInput` clears the draft
+immediately after valid submission, before the request resolves.
 Only `{ prompt }` is sent, so each request is independent of displayed exchanges.
 The client validates the success payload before rendering user text and assistant Markdown.
 No provider or server-module imports cross into the browser.
@@ -67,7 +67,7 @@ No provider or server-module imports cross into the browser.
 pending clears the prior error. A ref locks submission synchronously, including
 multiple calls before React rerenders. Empty prompts are rejected in the hook as
 well as the input. Success appends the exchange and returns to idle; failures
-preserve messages and draft text and expose only a fixed safe error message.
+preserve completed messages and expose only a fixed safe error message.
 
 Submission and request callbacks drive state transitions. Loading and error values
 are derived during render, and initial state uses simple constant values. The
@@ -83,9 +83,20 @@ messages, replace an error, or unlock a newer request. Completion and unmount
 clear timers; unmount invalidates and aborts the active request.
 
 The UI keeps existing messages visible, disables conflicting input actions, and
-shows an MUI spinner with a polite status message. Errors use an alert. The API
+shows a neutral MUI message-style skeleton with a visually hidden polite status
+message. Errors use an alert. The API
 contract and server-only OpenAI integration are unchanged. Browser abort does not
 guarantee cancellation of provider work already running on the server.
+
+The root Server Component uses `redirect("/chat")` from `next/navigation`.
+The outer chat application is constrained to the dynamic viewport with responsive
+padding inside that height. Container and Paper share a flexible hierarchy with
+zero minimum heights. A single scroll area contains history, loading, Clear Chat,
+and errors. The three-row composer stays anchored across state transitions and
+long drafts without layout effects. Hidden status text uses explicit pixel sizing
+to avoid MUI's percentage interpretation of numeric dimensions.
+Initialization and pending replies share rounded, neutral MUI skeletons with a
+slow pulse that is disabled for reduced-motion preferences.
 
 ## Phase 5 persistence and Markdown
 
@@ -95,9 +106,12 @@ an empty list for missing, invalid, or inaccessible storage. Writes and removal
 fail safely so React state remains usable. Storage failures may prevent persistence
 or removal across refresh; no successful disk write is assumed.
 
-The first server and browser render both use empty history. A mount effect reads
+The first server and browser render both use an uninitialized (`null`) history
+and show three rounded message skeletons, withholding the empty state and disabling input.
+A mount effect reads
 browser storage after hydration; lazy LocalStorage initialization would mismatch
 server HTML. Its narrowly documented lint exception permits this external read.
+The resulting array marks initialization complete, including when storage is empty or unavailable.
 The existing request-lifetime effect still aborts on unmount. There is no effect
 watching messages to save them. Success explicitly computes the next list from a
 ref, updates React state, and saves it outside React updater functions. Clear Chat

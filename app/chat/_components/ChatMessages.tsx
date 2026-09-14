@@ -2,11 +2,28 @@ import { Box, Stack, Typography } from "@mui/material";
 import type { ReactNode } from "react";
 import type { ChatMessage } from "../_types/chat";
 import ReactMarkdown from "react-markdown";
+import LoadingMessage from "./LoadingMessage";
 
-export default function ChatMessages({ messages, emptyState }: { messages: ChatMessage[]; emptyState: ReactNode }) {
+const visuallyHidden = {
+  position: "absolute", width: "1px", height: "1px", overflow: "hidden",
+  clipPath: "inset(50%)", whiteSpace: "nowrap",
+};
+
+export default function ChatMessages({ messages, emptyState, initializing = false, pending = false }: {
+  messages: ChatMessage[]; emptyState: ReactNode; initializing?: boolean; pending?: boolean;
+}) {
   return (
-    <Box component="section" aria-label="Conversation" sx={{ flex: 1, display: "grid", placeItems: "center", minWidth: 0, p: { xs: 3, sm: 6 } }}>
-      {messages.length === 0 ? emptyState : (
+    <Box component="section" aria-label="Conversation" sx={{ flex: "1 0 auto", display: "flex", flexDirection: "column", gap: 3, minWidth: 0, p: { xs: 3, sm: 6 } }}>
+      {initializing ? (
+        <Stack role="status" aria-live="polite" spacing={3}>
+          <Box component="span" sx={visuallyHidden}>Loading chat history…</Box>
+          <LoadingMessage width="52%" align="right" />
+          <LoadingMessage width="82%" />
+          <LoadingMessage width="62%" />
+        </Stack>
+      ) : messages.length === 0 ? (
+        !pending && <Box sx={{ flex: 1, display: "grid", placeItems: "center" }}>{emptyState}</Box>
+      ) : (
         <Stack role="log" aria-label="Messages" spacing={3} sx={{ width: "100%", minWidth: 0 }}>
           {messages.map((message) => (
             <Box component="article" aria-label={message.role === "user" ? "Your message" : "Assistant reply"} key={message.id}>
@@ -30,6 +47,12 @@ export default function ChatMessages({ messages, emptyState }: { messages: ChatM
           ))}
         </Stack>
       )}
+      <Box role="status" aria-live="polite">
+        {pending && <>
+          <Box component="span" sx={visuallyHidden}>Assistant · Waiting for a reply…</Box>
+          <LoadingMessage />
+        </>}
+      </Box>
     </Box>
   );
 }

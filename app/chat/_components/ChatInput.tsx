@@ -16,6 +16,7 @@ export default function ChatInput({ onSubmit, disabled = false }: ChatInputProps
     const trimmedPrompt = prompt.trim();
     if (!trimmedPrompt || disabled) return;
     onSubmit(trimmedPrompt);
+    setPrompt("");
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -34,8 +35,7 @@ export default function ChatInput({ onSubmit, disabled = false }: ChatInputProps
           label="Your message"
           placeholder="What would you like to explore?"
           multiline
-          minRows={3}
-          maxRows={8}
+          rows={3}
           fullWidth
           value={prompt}
           disabled={disabled}

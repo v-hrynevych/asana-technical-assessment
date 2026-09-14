@@ -1,10 +1,34 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
+import { hydrateRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import ChatConversation from "@/app/chat/_components/ChatConversation";
 import { CHAT_STORAGE_KEY, saveMessages } from "@/app/chat/_lib/storage";
 
 afterEach(() => vi.unstubAllGlobals());
 const chat = <ChatConversation emptyState={<p>Empty chat</p>} />;
+
+it("shows initialization feedback until persisted history hydrates without an empty-state flash", async () => {
+  saveMessages([{ id: "1", role: "assistant", content: "Saved reply" }]);
+  const container = document.createElement("div");
+  container.innerHTML = renderToString(chat);
+  expect(container.textContent).toContain("Loading chat history");
+  expect(container.querySelector('[role="status"]')?.querySelectorAll(".MuiSkeleton-rounded")).toHaveLength(3);
+  expect(container.textContent).not.toContain("Empty chat");
+  const emptyStateRendered = vi.fn(() => <p>Empty chat</p>);
+  const EmptyState = emptyStateRendered;
+  const onRecoverableError = vi.fn();
+  let root: ReturnType<typeof hydrateRoot>;
+  await act(async () => {
+    root = hydrateRoot(container, <ChatConversation emptyState={<EmptyState />} />, { onRecoverableError });
+  });
+  expect(container.textContent).toContain("Saved reply");
+  expect(container.textContent).not.toContain("Loading chat history");
+  expect(container.querySelector(".MuiSkeleton-root")).toBeNull();
+  expect(emptyStateRendered).not.toHaveBeenCalled();
+  expect(onRecoverableError).not.toHaveBeenCalled();
+  act(() => root.unmount());
+});
 
 it("restores history and clears visible messages, storage, and errors", async () => {
   saveMessages([{ id: "1", role: "assistant", content: "Saved reply" }]);

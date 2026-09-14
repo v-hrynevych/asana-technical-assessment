@@ -11,7 +11,7 @@
 | 4 — Application State | Complete; required checks passed |
 | 5 — Bonus Features | Complete; required checks passed |
 | 6 — Testing | Complete; 10 focused tests |
-| 7 — Final Quality Review | Not started |
+| 7 — Final Quality Review | UX fixes implemented; automated checks passed; manual review pending |
 | 8 — Submission | Not started |
 
 ## Phase 1 scope and decisions
@@ -338,4 +338,63 @@ No new warnings; existing dependency warnings remain unchanged.
 
 The compact suite does not exhaustively cover keyboard variants, Markdown safety,
 hydration, storage quota/access failures, or every API payload. Manual browser and
-live-provider verification remain outstanding. Phases 7–8 are not started.
+live-provider verification remain outstanding. Phase 8 is not started.
+
+## Phase 7 — Final Quality Review
+
+Valid submissions clear the draft immediately in the input event handler, before
+the AI response. Empty/whitespace-only input remains unchanged; Enter submits,
+Shift + Enter preserves native newline behavior, and IME protection remains intact.
+After failure or timeout, users can enter a prompt again.
+
+History starts as `null`, distinguishing initialization from an empty conversation.
+The existing browser-storage mount effect restores the array after hydration;
+no new effects or storage writes in effects are introduced. Server HTML and the
+first client render show three rounded MUI message-bubble skeletons of varied widths.
+The empty state and input interaction wait for initialization to finish, including
+when stored data is missing, malformed, or inaccessible.
+
+The outer application is constrained to `100dvh`, including responsive padding.
+Container and Paper form a flexible hierarchy with zero minimum heights and
+contained overflow. One internally scrollable conversation area is shared by
+initialization, empty, pending, and restored states. The composer uses three rows
+so long drafts and submission do not change its height. History, Clear Chat,
+errors, and skeletons cannot grow the document or push the composer down.
+Hidden status announcements use explicit one-pixel dimensions (numeric `1` in
+MUI sizing means 100%). No layout effects or fixed pixel full-page heights are used.
+
+The root Server Component calls Next.js `redirect("/chat")`; `/chat` is the canonical
+UI route. There is no separate landing page, client redirect, or duplicate chat UI.
+
+Pending replies display a rounded MUI Skeleton after existing messages inside the
+conversation area. Both loading states use soft theme gray, a slow subtle pulse,
+and visually hidden polite status announcements. Reduced-motion preferences disable
+the pulse. Decorative skeletons are hidden from assistive technology.
+Previous messages stay visible; loading is never serialized. Server boundaries,
+OpenAI integration, timeout, safe client errors, duplicate protection, Clear Chat,
+persistence, and Markdown rendering are preserved. No dependencies were added.
+
+The suite contains 12 tests across 6 files, including one root redirect test.
+Existing input/request tests cover
+immediate clearing, invalid draft preservation, keyboard behavior, retained history
+during loading, transient-state exclusion, and recovery. One additional hydration
+test verifies three initialization skeletons, no empty-state render while history
+restores, and no recoverable hydration errors. The request test verifies an
+assistant skeleton inside the conversation while prior messages remain visible.
+
+Validation using `corepack pnpm` (the available pnpm launcher): `pnpm lint`,
+`pnpm test` (12 tests), `pnpm build`, and `pnpm exec tsc --noEmit` passed.
+Git status and diff were reviewed, including whitespace checks. Vitest required
+approved execution outside the sandbox because subprocess startup returned EPERM.
+
+Headless Chrome checks against the production build passed at 1440×900, 768×1024,
+375×667, 320×568, and 667×375. They verified the root redirect, server-rendered
+initialization skeletons, empty chat, an 80-line draft, pending skeleton, long mocked
+reply, and refresh with 30 persisted messages. Document height equaled viewport
+height; composer coordinates stayed stable; overflowing history had exactly one
+vertical scroll container. Browser requests were mocked; no live provider calls.
+Physical-device keyboard behavior, visual animation review, and live-provider
+verification remain outstanding.
+Existing dependency warnings from Phase 1 remain unchanged. Source review also
+found existing raw exception logging in `app/api/chat/route.ts`; its sanitization
+remains unresolved outside these UX fixes. Phase 8 has not started.

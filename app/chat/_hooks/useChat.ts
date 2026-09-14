@@ -17,7 +17,7 @@ interface ActiveRequest {
 }
 
 export default function useChat() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[] | null>(null);
   const [requestState, setRequestState] = useState<RequestState>({ status: "idle" });
   const activeRequest = useRef<ActiveRequest | null>(null);
   const currentMessages = useRef<ChatMessage[]>([]);
@@ -41,7 +41,7 @@ export default function useChat() {
   }, []);
 
   function clearChat() {
-    if (activeRequest.current) return;
+    if (messages === null || activeRequest.current) return;
     currentMessages.current = [];
     setMessages([]);
     clearMessages();
@@ -50,7 +50,7 @@ export default function useChat() {
 
   async function submitPrompt(value: string) {
     const prompt = value.trim();
-    if (!prompt || activeRequest.current) return;
+    if (!prompt || messages === null || activeRequest.current) return;
 
     const controller = new AbortController();
     const request: ActiveRequest = {
@@ -102,7 +102,8 @@ export default function useChat() {
   }
 
   return {
-    messages,
+    messages: messages ?? [],
+    initializing: messages === null,
     pending: requestState.status === "pending",
     error: requestState.status === "error" ? requestState.message : null,
     submitPrompt,
